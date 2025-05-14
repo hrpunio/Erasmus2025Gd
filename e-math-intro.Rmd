@@ -1,0 +1,98 @@
+---
+title: "Short intro to math"
+author: "TP"
+date: "2024"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+```
+
+## Introduction
+
+Coding math formulas is borrowed from LaTeX (not a rubber but
+typesetting system)
+
+### Subsection 
+ 
+ Listing:
+ 
+1. One
+
+2. Two
+
+3. Three
+
+or
+
+* One
+
+* **Two**
+
+* *three*
+ 
+### Second subsectio
+ 
+
+## General remarks
+
+Put every formula between `$$` and `$$`. Spaces inside are irrelevant
+
+
+## Subscripts/superscripts
+
+```
+$$x_{i=1}^2 + y_j^{33} = z_j^{z^{2}}$$
+```
+
+$$x_{i=1}^2 + y_j^{33} = z_j^{z^{2}}$$
+
+## Fractions
+
+```
+\frac{x}{y} + 
+\frac{p +1}{      
+\frac{q}{r^2}}
+```
+
+$$\frac{x}{y} + \frac{p +1}{  \frac{q}{r^2}}$$
+
+spaces are irrelevant
+
+
+## Greek letters
+
+```
+\alpha^2 + \beta + \xi + \epsilon
+```
+
+$$ \alpha^2 + \beta + \xi + \epsilon$$
+
+
+## Big operators
+
+```
+$$\sum_{i=1}^n \int_{-\infty}^{+\infty}$$
+```
+
+$$\sum_{i=1}^n \int_{-\infty}^{+\infty}$$
+
+## Inline math 
+
+Use single `$` sign as delimiter, ie `$x^2$`.
+
+## Errors
+
+No math usually, so be careful when typesetting:
+
+```
+$$\sum_{i=1}^ \int_{-\infty}^{+\infty}$$
+```
+
+$$\sum_{i=1}^ \int_{-\infty}^{+\infty}$$
+
+what is wrong?

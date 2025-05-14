@@ -1,0 +1,228 @@
+---
+title: 'Mini intro to ggplot'
+author:
+- name: Tomasz Przechlewski
+  email: t.plata-przechlewski@psw.kwidzyn.edu.pl
+  affiliation: Powiślańska Szkoła Wyższa (Kwidzyn/Poland)
+date: "June/2023"
+output: html_document
+description: (c) Tomasz Przechlewski / CC-BY license
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+It is expected by `ggplot2`  that data is in long format. If it
+is in wide it is easy to transform it even on the fly..
+
+My minimal set of external packages is:
+
+```{r, message=FALSE, warning=FALSE}
+library("ggplot2") ## charting functions
+library("tidyverse") ## data-manipulation
+library("scales") ## scales
+```
+
+As a example I will use *Prevalence of obesity among adults*
+from WHO database
+
+```{r}
+obesity <- read.csv(file='obesity_who_all_C.csv', sep=';', header=T)
+str(obesity)
+```
+
+The data is in long format and contains:
+year (`rok`), region (`region`), country (`kraj`)
+sex (`plec`), and BMI (`nadwaga`)
+
+Variable `sex` has three values: 
+`MLE`, `FMLE` and `BTSX` (both sexes combined)
+
+## GGplot syntax
+
+Looks complicated but it is not. All charts are constructed
+along the schema:
+
+```
+ggplot(df, aes(x= xcol, y=ycol  )) +
+   geom_line( options ) ## line-plot, or
+   geom_point (options) ## dot-plot, or
+   geom_bar (options ) ## bar plot
+```
+
+where: `df` is a dataframe; 'xcol' is data for X-axis
+and `ycol` is data for Y-axis.
+
+Example: to get one-dimensional data from `obesity` dataframe
+one has to filter it. Assume one wants to plot data for Poland
+with both sexes (F/M) combined:
+
+```{r}
+obesityPL <- obesity %>% filter (kraj == 'POL' & plec == 'BTSX')
+ggplot(obesityPL, aes(x= as.factor(rok), y=nadwaga, group=1 )) +
+  geom_point(size=1.5, color='red' )
+  
+```
+
+or
+
+```{r}
+ggplot(obesityPL, aes(x= as.factor(rok), y=nadwaga, group=1 )) +
+  #geom_point(size=1.5, color='red' ) +
+  geom_bar(stat="identity", alpha=.3, color='yellow', fill='violet')
+```
+
+or
+
+```{r}
+ggplot(obesityPL, aes(x= as.factor(rok), y=nadwaga, group=1 )) +
+  #geom_point(size=1.5, color='red' ) +
+  #geom_bar(stat="identity", alpha=.3, color='yellow', fill='violet') +
+  geom_line(size=2, alpha=.1)
+```
+
+## Line plot (time series)
+
+BMI for Poland:
+
+```{r}
+## napierw filter z pakietu dpyr
+## tylko kraj==POL; plec różna od BTSX
+obesityPL <- obesity %>% filter (kraj == 'POL' & plec != 'BTSX')
+
+## funkcja nth do pomijania pozycji na skali jeżeli jest ich za dużo
+every_nth = function(n) {
+  return(function(x) {x[c(TRUE, rep(FALSE, n - 1))]})
+}
+
+popl0 <- ggplot(obesityPL, aes(x= as.factor(rok), 
+        group=as.factor(plec), color=as.factor(plec), y=nadwaga )) +
+  geom_line(size=.5 ) +
+  geom_point(size=2.5, alpha=.3) +
+  xlab(label="") +
+  ## drukuj co 10 wartość
+  scale_x_discrete( breaks = every_nth(n = 10)) +
+  ylab(label="tys") +
+  ##theme_nikw()+
+  ggtitle("Nadwaga w PL")
+popl0
+
+```
+
+better legend:
+
+```{r}
+popl1 <- popl0 + 
+scale_color_discrete(name="Płeć", labels =c("M", 'F'),
+                       breaks=c('MLE', 'FMLE'))
+popl1
+```
+
+Still better, convert `rok` to date and use
+appriopriate functions from `scales` package:
+
+```{r}
+popl2 <- ggplot(obesityPL, aes(x= as.Date(as.character(rok), "%Y"),
+        group=as.factor(plec), color=as.factor(plec), y=nadwaga )) +
+  geom_line(size=.5 ) + geom_point(size=2.5, alpha=.3) +
+  ylab(label="tys") + xlab(label="rok") +
+  ## %y to rok w notacji dwucyfrowej np. 21
+  scale_x_date( breaks = "4 years", labels = date_format("%y")) +
+  scale_color_discrete(name="Płeć", labels =c("M", 'F'),
+                       breaks=c('MLE', 'FMLE')) +
+  ggtitle("Nadwaga w PL")
+popl2
+```
+
+Several countries
+
+```{r}
+countries <- c('POL', 'GER', 'ESP', 'CZE', 'ITA', 'FRA', 'FIN',
+               'AFG', 'CHN', 'IND', 'NZA',
+               'FJI', 'TON', 'WSM',
+               'ETH', 'NGA', 'USA', 'CAN')
+oo <- obesity %>% filter (plec == 'BTSX' & kraj %in% countries) %>%
+  as.data.frame
+
+poc <- ggplot(oo, aes(x= as.factor(rok),  group=as.factor(kraj),   color=as.factor(kraj), y=nadwaga )) +
+  geom_line(size=.5, alpha=.6 ) +
+  geom_point(size=.5, alpha=.3) +
+  xlab(label="") +
+  ylab(label="tys") +
+  scale_x_discrete( breaks = every_nth(n = 10)) +
+  ggtitle("Nadwaga w wybranych krajach świata")
+poc
+```
+
+Many countries and both sexes
+
+```{r, fig.height=12}
+
+ox <- obesity %>% filter (plec != 'BTSX' & kraj %in% countries) %>%
+  as.data.frame
+
+pox <- ggplot(ox, aes(x= as.factor(rok), 
+          group=as.factor(plec), color=as.factor(plec), y=nadwaga )) +
+  geom_line(size=.5, alpha=.6 ) +
+  geom_point(size=.5, alpha=.3) +
+  ylab(label="tys") +
+  facet_wrap( ~kraj, scales = "fixed") +
+  ggtitle("Nadwaga w PL", 
+          subtitle=sprintf(""))
+pox
+```
+
+## Combined point and bar plot
+
+Two point plots plus bar plot for the difference
+
+
+```{r, fig.height=12}
+obesity$yr <- as.numeric(as.character(obesity$rok))
+
+obesity_diff <- obesity %>%
+  filter (plec == 'BTSX' & yr > 1979 ) %>%
+  group_by(kraj) %>%
+  summarise(fst= nadwaga[which.min(yr)], 
+            lst = nadwaga[which.max(yr)],
+            diff = nadwaga[which.max(yr)] - nadwaga[which.min(yr)])
+  
+
+poworld3 <- obesity_diff %>%
+  ggplot(aes(x = reorder(kraj, lst ))) +
+  geom_point(aes(y = lst, color="lst"), size=1 ) +
+  geom_point(aes(y = fst, color="fst"), size=1 ) +
+  geom_bar(aes(y = diff, fill='diff'), stat="identity", alpha=.25 ) +
+  xlab(label="kraj") +
+  ylab(label="obesity") +
+  ggtitle("Nadwaga na świecie") +
+  ##
+  scale_color_manual(name="", labels =c("2016", "1980"),
+                     values = c(lst="red", fst="blue" ) ) +
+  scale_fill_manual(name="", values = c( diff="green" ) ) +
+  #
+  theme(axis.text = element_text(size = 4)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_flip()
+poworld3
+```
+
+## Boxplot
+
+Boxplots for 1980, 1990, 2000, and 2016
+
+```{r}
+lata <- c ('1980', '1990', '2000', '2016')
+oz <- obesity %>% filter ((rok %in% lata ) & plec == 'BTSX')
+
+pow <- ggplot(oz, aes(x=rok, y=nadwaga, fill=rok)) + 
+  geom_boxplot() + 
+  ylab("#") + 
+  xlab('')
+pow
+```
+
+

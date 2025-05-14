@@ -1,0 +1,236 @@
+---
+title: "Cobb-Douglas"
+author: "TP"
+date: "2024-06-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = F, warning = F )
+```
+
+## Data
+
+Data are from World Bank
+
+
+```{r}
+library("tidyverse") ## data manipulation 
+library("ggplot2")   ## better graphics
+library('WDI')       ## easy import from WBank
+library('knitr')     ## decent tables
+library("lmtest")
+library("car")      ## D-W test
+
+## vector of indicators
+wdi.indicators <- c(
+  'NE.GDI.FTOT.ZS',  #= Gross fixed capital formation (% if GDP)
+  'NE.GDI.FTOT.KD',  #= ditto Constant 2015 
+  'SL.TLF.TOTL.IN',  #= Labor force, total
+  'NY.GDP.PCAP.KD',  #= GDP per capita (constant 2015 US$)
+  'SP.POP.TOTL'      #= Population, total
+)
+
+wdi.indicators
+
+year.start <- 1990
+
+f0 <- WDI(wdi.indicators, country = "all", start=1990)
+
+f1 <- f0 %>%
+  select (
+      country,
+      iso3c,
+      year,
+      C =NE.GDI.FTOT.KD,
+      L =SL.TLF.TOTL.IN,
+      gdppc = NY.GDP.PCAP.KD,
+      pop = SP.POP.TOTL) %>%
+  mutate ( gdp = gdppc * pop)
+
+## Somewhere at WB 
+## there is a list of all countries and country-groups
+## I have saved it into CSV file
+wb.groups <- read.csv("wb_groups.csv", sep=';')
+
+## Countries/groups
+countries <- wb.groups %>%
+  group_by(CountryCode) %>%
+  summarise(code=first(CountryCode)) %>% pull (code)
+
+## EU members
+## eu.members <- wb.groups %>% filter (GroupCode == 'EUU') %>% pull(CountryCode)
+
+## Income groups
+## https://datahelpdesk.worldbank.org/knowledgebase/articles/906519-world-bank-country-and-lending-groups
+##income.groups.codes <- c ('HIC', ##High income
+##                          'LIC', ##Low income
+##                          'LMC', ##Lower middle income
+##                          ##'LMY', ##Low & middle income
+##                          ###'MIC', ##Middle income
+##                          'UMC'  ##Upper middle income
+##)
+##income.groups <- wb.groups %>% filter ( GroupCode %in% income.groups.codes )
+###
+
+##nrow(f1)
+
+f2 <- f1 %>% filter (iso3c %in% countries )
+
+## Factor = nominal/ordinal variable
+##nlevels(f2$iso3c) ## retutns error
+##nlevels(as.factor(f2$iso3c))
+## it is recommended to make a factor 
+## Sierra Leone SLE 1997 C=-38732886 !!!
+```
+
+Correlation matrix:
+
+```{r}
+f2 <- f1 %>% filter (iso3c %in% countries ) %>%
+  filter (iso3c != 'SLE') %>%
+  filter (year == 2022) %>%
+  mutate (iso3c = as.factor(iso3c),
+          lC = log(C),
+          lL = log(L),
+          lgdp = log(gdp))
+## Correlation matrix
+
+##cor(f2) # <- error of course
+##f2 %>% select (lgdp, lC, lL) %>%  as.matrix %>% cor # NA
+f2 %>% select (lgdp, lC, lL) %>% na.omit() %>% as.matrix %>% cor
+
+## Graphics
+## XY-plot
+```
+
+
+
+```{r}
+p1 <- ggplot(f2, aes(x=lC, y=lgdp)) +
+    geom_point()
+p1
+
+## Scatter plot matrix
+f2 %>% dplyr::select(lgdp, lC, lL) %>% pairs()
+```
+
+
+## Model 1
+
+Cobb-Doublas production function:
+
+$$ GDP = a C^b L^c$$
+
+```{r}
+m0 <- lm (lgdp ~ lC + lL, data=f2)
+
+summary(m0)
+
+## A
+names(m0)
+
+# applying fitted values to my data frame
+fitted.m0 <- m0$fitted.values
+
+##f2 <- f2 %>% mutate (fitted = fitted.m0)
+## error why?
+
+f2 <- f2 %>% na.omit()
+f2 <- f2 %>% mutate (fitted = fitted.m0)
+
+## Actual vs fitted values
+p2 <- ggplot(f2, aes(x=lgdp, y=fitted)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color='red') 
+p2
+
+# Breusch-Pagan Test For Homoscedasticity
+# high p = no heteroscedasticity
+bptest(m0)
+
+### Check for autocorrelation of error term
+## Check autocorrelation of error term
+## Durbin Watson Test for Autocorrelation
+## high p = errors not autocorrelated
+durbinWatsonTest(m0)
+
+### Check for normality of residuals
+## visually looking at qq-plot
+plot(m0, which = 2) 
+## or
+qqPlot(m0)
+shapiro.test(m0$residuals)
+
+## Check multicollinearity
+## for models with 
+
+## multicollinearity
+
+vif(m0)
+
+
+## Anova
+
+anova(m0)
+##Df Sum Sq Mean Sq   F value               Pr(>F)    
+##lC          1 518.19  518.19 4781.1737 < 0.0000000000000002 ***
+##lL          1   0.31    0.31    2.8617              0.09316 .  
+##Residuals 127  13.76    0.11                         
+##               ^^^^^-- sum of squares about the mean of (lgdp)
+##               explained by constant = 13.76, by lL = 0.31 (insignificant) etc...
+
+## predicted values for actual values
+pred0 <- predict(m0)
+```
+
+## Panel estimation
+
+```{r}
+#pred0 <- predict(m0, newdata = ...)
+
+############################################################################
+### Panel data regression #################################################
+library("plm")
+##install.packages("plm")
+
+
+f2 <- f1 %>% filter (iso3c %in% countries ) %>%
+  filter (iso3c != 'SLE') %>%
+  ##filter (year == 2022) %>%
+  mutate (iso3c = as.factor(iso3c),
+          lC = log(C),
+          lL = log(L),
+          lgdp = log(gdp))
+
+f2.p <- pdata.frame(f2, index=c('iso3c', 'year'))
+
+m.fixed <- plm(lgdp ~ lC + lL, data=f2.p, model="within" )  #fixed model
+summary(m.fixed)
+
+m.random <- plm(lgdp ~ lC + lL, data=f2, index=c("iso3c", "year"), model="random")  #random model
+summary(m.random)
+
+## If the p-value is significant  then use fixed effects, 
+## if not use random effects.
+phtest(m.fixed, m.random) #Hausman test
+## Fixed is better
+
+## Pooled regression
+m.pool <- plm(lgdp ~ lC + lL, data=f2.p, model="pooling" )  #fixed model
+summary(m.pool)
+
+## pooled vs FE
+## ============
+pFtest(m.fixed, m.pool) 
+## if p < 0,05 fixed effect is better than pooled
+
+## Breusch-Pagan Lagrange Multiplier for random effects. 
+## H_0: no random panel effect
+plmtest(m.random, type=c('bp'))
+## RE is better than pooled
+```
+
+## Results
+
+bla, bla bla

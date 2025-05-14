@@ -1,0 +1,201 @@
+---
+title: 'Empirical verification of Environmental Kuznets Curve'
+author: Tomasz Przechlewski
+date: "June/2024"
+output: html_document
+description: (c) Tomasz Przechlewski / CC-BY license
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("tidyverse") ## data manipulation 
+library("ggplot2")   ## better graphics
+library('WDI')       ## easy import from WBank
+library('knitr')     ## decent tables
+library("lmtest")    ##
+library("car")       ## D-W test
+
+```
+
+## Problem
+
+Environmental Kuznets Curve (EKC) hypothesis assumes
+that relation between CO2 emission per capita (E)
+and GDP per capita is of `inverted U` type:
+
+$$E = a + b·GDP + c·GDP²$$
+
+where  ($c <0$)
+
+## The data
+
+The data comes from the WorldBank databse. The following indicators were used:
+
+*  'EN.GHG.CO2.MT.CE.AR5' (co2) = emission in tons per/capita
+
+*  'NY.GDP.PCAP.KD' (gdp) = GDP per capita (constant 2015 US$)
+ 
+*  'NY.GDP.PCAP.PP.KD' (gdppp)  = GDP per capita,
+   PPP (constant 2017 international $)
+
+The time interval analysed is 1990--2020
+
+```{r}
+wdi.indicators <- c(
+  'EN.GHG.CO2.MT.CE.AR5', ## CO2 emission in tons per/capita
+  'NY.GDP.PCAP.KD',    ## GDP per capita (constant 2015 US$)
+   ##'NY.GDP.PCAP.CD', #= GDP per capita (current US$) 
+  'NY.GDP.PCAP.PP.KD'  ## GDP per capita, PPP (constant 2017 international $)
+                       ## PPP= purchase power parity
+)
+year.start <- 1990
+
+f0 <- WDI(wdi.indicators, country = "all", start=year.start)
+
+## Select appropriate columns.
+## Change colum names to something less complicated
+f1 <- f0 %>% 
+  ## Select relevant variables
+  ## name1 = name2 denotes _rename_ name2 as name1
+  ## eq. EN.ATM.CO2E.PC is renamed to co2 (which is simpler)
+  select (
+          country, 
+          iso3c, 
+          year, 
+          co2 = EN.GHG.CO2.MT.CE.AR5, 
+          gdppp = NY.GDP.PCAP.PP.KD, 
+          gdp = NY.GDP.PCAP.KD ) %>%
+  ## Compute variables
+  mutate(
+      lco2 = log(co2),
+      lgdp = log(gdp),
+      lgdp2 = log(gdp)^2,
+      lgdppp = log(gdppp),
+      lgdppp2 = lgdppp^2 
+  )
+```
+
+## EKC for China
+
+
+### Data description
+
+```{r}
+f2 <- f1 %>% filter (iso3c == 'CHN')
+
+f2 %>% select (co2, gdp) %>% summary()
+
+p1 <- ggplot(f2, aes(y=lco2, x=lgdp)) +
+  geom_point()
+p1
+
+
+## Scatter-plot matrix
+## scatter-plot matrix for co2, gdp, lgdp
+f2 %>% select(co2, lco2, gdp, lgdp ) %>% pairs()
+```
+
+### Regression equation
+
+```{r}
+## Estimate regression equation:
+##     ln(co2) = a + b log(GDP) + c log(GDP)²
+## results are stored in m0 variable
+
+m0 <- lm(co2 ~ lgdp + lgdp2, data=f2)
+summary(m0)
+```
+
+Shortly describe results...
+
+### Check regression assumptions
+
+```{r}
+# Breusch-Pagan Test For Homoscedasticity
+# high p = no heteroscedasticity
+bptest(m0)
+
+## Check autocorrelation of error term
+## Durbin Watson Test for Autocorrelation
+## high p = errors not autocorrelated
+durbinWatsonTest(m0)
+
+## Check for normality of residuals
+## 
+shapiro.test(m0$residuals)
+
+```
+
+Shortly describe results...
+
+
+## Estimate EKC for OECD countries for 2020
+
+```{r}
+## Declare vector for all OECD ISO3 identifiers:
+oecd <- c("AUS", "AUT", "BEL", "CAN", "CHL", "COL", "CRI", "CZE", "DNK", "EST", "FIN", "FRA",
+          "DEU", "GRC", "HUN", "ISL", "IRL", "ISR", "ITA", "JPN", "KOR", "LVA", "LTU", "LUX",
+          "MEX", "NLD", "NZL", "NOR", "POL", "PRT", "SVK", "SVN", "ESP",
+          "SWE", "CHE", "TUR", "GBR", "USA")
+	  
+## or UE-27 if you like:
+ue <- c('AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN',
+        'FRA', 'DEU', 'GRC', 'HUN', 'IRL', 'ITA', 'LVA', 'LTU', 'LUX',
+        'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE' )
+## or same other group defined in a similar way
+
+
+## Estimate EKC for OECD for 2020
+## Filter data for OECD (using oece vector declared above)
+f2 <- f1 %>% filter (iso3c %in% oecd ) %>%
+  ## filter for 2020 (there is no emission for 2021/2022 yet)
+  filter (year == 2020) 
+  
+
+```
+
+### Data description
+
+```{r}
+f2 %>% select (co2, gdp) %>% summary()
+
+p1 <- ggplot(f2, aes(y=lco2, x=lgdp)) +
+  geom_point()
+p1
+
+## Scatter plot matrix
+f2 %>% dplyr::select(lco2, lgdp, lgdppp) %>% pairs()
+```
+
+### Regression equation
+
+```{r}
+
+## Estimate regression equation:
+##     ln(co2) = a + b log(GDP) + c log(GDP)²
+## results are stored in m1 variable
+m1 <- lm(co2 ~ lgdp + lgdp2, data=f2)
+summary(m1)
+```
+
+Shortly describe results...
+
+### Check regression assumptions
+
+```{r}
+# Breusch-Pagan Test For Homoscedasticity
+# high p = no heteroscedasticity
+bptest(m1)
+
+## Check autocorrelation of error term
+## Durbin-Watson Test for Autocorrelation
+## high p = errors not autocorrelated
+durbinWatsonTest(m0)
+
+## Check for normality of residuals
+## 
+shapiro.test(m0$residuals)
+```
+
+Shortly describe results...

@@ -1,0 +1,24 @@
+---
+title: "Introduction to Econometrics with R (using RR apprach)"
+author: 
+  - name: "Tomasz Przechlewski"
+    email:  t.plata-przechlewski@psw.kwidzyn.edu.pl
+    affiliation: "Powiślańska Szkoła Wyższa (Kwidzyn/Poland)"
+description: (c) Tomasz Przechlewski / CC-BY license 
+date: "2025"
+output: html_document
+---
+
+## Econometrics
+
+Assume you know what it is
+
+## R/Rstudio
+
+I saw it in Gdańsk. Scrap :-)
+
+## Reproducible research
+
+Ditto
+
+
